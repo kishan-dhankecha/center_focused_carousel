@@ -29,6 +29,7 @@ class _CenterFocusedCarouselState extends State<CenterFocusedCarousel>
     with SingleTickerProviderStateMixin {
   //
   var _direction = ScrollDirection.idle;
+  var _endOffset = 0.0;
 
   //
   late final ValueNotifier<int> _currentIndex;
@@ -48,6 +49,23 @@ class _CenterFocusedCarouselState extends State<CenterFocusedCarousel>
     _currentIndex = ValueNotifier<int>(
       widget.options.initialIndex,
     )..addListener(() => setState(() {}));
+
+    WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+      final valueAdder = MediaQuery.of(context).size.width * 0.22;
+      _endOffset = valueAdder - widget.options.backgroundOffset;
+
+      _xOffsetTween = Tween<double>(
+        begin: 0,
+        end: _endOffset,
+      ).animate(_controller);
+
+      _scaleTween = Tween<double>(
+        begin: widget.options.viewFraction,
+        end: widget.options.viewFraction * widget.options.sizeRatio,
+      ).animate(_controller);
+
+      setState(() {});
+    });
   }
 
   @override
@@ -59,19 +77,6 @@ class _CenterFocusedCarouselState extends State<CenterFocusedCarousel>
 
   @override
   Widget build(BuildContext context) {
-    final valueAdder = MediaQuery.of(context).size.width * 0.22;
-    final endOffset = valueAdder - widget.options.backgroundOffset;
-
-    _xOffsetTween = Tween<double>(
-      begin: 0,
-      end: endOffset,
-    ).animate(_controller);
-
-    _scaleTween = Tween<double>(
-      begin: widget.options.viewFraction,
-      end: widget.options.viewFraction * widget.options.sizeRatio,
-    ).animate(_controller);
-
     return GestureDetector(
       onHorizontalDragEnd: _onHorizontalDragEnd,
       onHorizontalDragUpdate: (details) {
@@ -88,9 +93,13 @@ class _CenterFocusedCarouselState extends State<CenterFocusedCarousel>
           }
         }
       },
-      child: Stack(
-        children: _getStackWidgets(endOffset),
-      ),
+      child: _scaleTween == null || _xOffsetTween == null
+          ? const Center(
+              child: CircularProgressIndicator(),
+            )
+          : Stack(
+              children: _getStackWidgets(_endOffset),
+            ),
     );
   }
 
@@ -196,18 +205,18 @@ class _CenterFocusedCarouselState extends State<CenterFocusedCarousel>
           } else {
             xOffset = _xOffsetTween!.value;
           }
-          return AnimatedBuilder(
-            animation: _scaleTween!,
-            builder: (context, child) {
-              return Transform.translate(
-                offset: Offset(xOffset, 0),
-                child: Transform.scale(
+          return Transform.translate(
+            offset: Offset(xOffset, 0),
+            child: AnimatedBuilder(
+              animation: _scaleTween!,
+              builder: (context, child) {
+                return Transform.scale(
                   scale: _scaleTween!.value,
                   child: child!,
-                ),
-              );
-            },
-            child: child!,
+                );
+              },
+              child: child!,
+            ),
           );
         },
         child: widget.children[_currentIndex.value],
